@@ -1,0 +1,96 @@
+"use strict";
+Object.defineProperty(exports, "__esModule", { value: true });
+exports.pluginOptionsSchema = void 0;
+const graphql_1 = require("gatsby/graphql");
+const common_tags_1 = require("common-tags");
+const DEFAULT_QUERY = `
+  allSitePage {
+    nodes {
+      path
+    }
+  }
+`;
+const DEFAULT_XML_ATTRIBUTES = 'version="1.0" encoding="UTF-8"';
+const DEFAULT_URLSET_SITEMAPINDEX_ATTRIBUTES = 'xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"';
+const pluginOptionsSchema = ({ Joi }) => {
+    const validateQuery = ({ query }) => {
+        if (query) {
+            try {
+                (0, graphql_1.parse)(query);
+            }
+            catch (e) {
+                throw new Error((0, common_tags_1.stripIndent) `
+        Invalid plugin options for "gatsby-plugin-sitemap":
+        "query" must be a valid GraphQL query. Received the error "${e === null || e === void 0 ? void 0 : e.message}"`);
+            }
+        }
+    };
+    const validationSerializeQuery = (sitemap) => {
+        if (!!(sitemap === null || sitemap === void 0 ? void 0 : sitemap.serializer) !== !!(sitemap === null || sitemap === void 0 ? void 0 : sitemap.queryName)) {
+            new Error((0, common_tags_1.stripIndent) `
+          Invalid plugin options for "gatsby-plugin-sitemap":
+          You must add both serialize and queryName (or neither)`);
+        }
+    };
+    const sitemapSchema = Joi.object({
+        writeFile: Joi.boolean().default(true),
+        fileName: Joi.string()
+            .pattern(/.*\.xml$/)
+            .description("The sitemap file name"),
+        outputFolder: Joi.string().description("Path appended at the end of the global outputFolder path"),
+        xslPath: Joi.string().description("Path to the xsl file used to pimp your sitemap !"),
+        lastmod: Joi.string().description("lastmod value for this sitemap"),
+        children: Joi.array().items(Joi.link("...").description("Children sitemap, referenced into parent")),
+        queryName: Joi.string()
+            .external(validationSerializeQuery)
+            .description("Name of the graphQL query (ex : allSitePage)"),
+        filterPages: Joi.function().description("Filter pages by returning true or false"),
+        serializer: Joi.function().external(validationSerializeQuery),
+        xmlAnchorAttributes: Joi.string()
+            .default(DEFAULT_XML_ATTRIBUTES)
+            .description("Attributes to add <?xml {here} ?>"),
+        urlsetAnchorAttributes: Joi.string()
+            .default(DEFAULT_URLSET_SITEMAPINDEX_ATTRIBUTES)
+            .description("Attributes to add <urlset {here} >"),
+        sitemapindexAnchorAttributes: Joi.string()
+            .default(DEFAULT_URLSET_SITEMAPINDEX_ATTRIBUTES)
+            .description("Attributes to add <sitemap {here} >"),
+        trailingSlash: Joi.string()
+            .default("auto")
+            .pattern(/(auto|remove|add)$/)
+            .description(`
+        remove : all trailing slash are removed
+        add : add trailing slash at the end of every urls
+        auto : existing trailing slash stays
+      `),
+        arbitraryNodes: Joi.array().items(Joi.object()),
+    });
+    return Joi.object({
+        query: Joi.string()
+            .default(DEFAULT_QUERY)
+            .external(validateQuery)
+            .description((0, common_tags_1.stripIndent) `
+        (GraphQL Query) The query for the data you need to generate the sitemap.
+        It's required to get the site's URL, if you are not fetching it from \`site.siteMetadata.siteUrl\`,
+        you will need to set a custom \`resolveSiteUrl\` function.
+        If you override the query, you may need to pass in a custom \`resolvePagePath\` or
+        \`resolvePages\` to keep everything working.
+        If you fetch pages without using \`allSitePage.nodes\` query structure
+        you will definately need to customize the \`resolvePages\` function.`),
+        sitemapTree: sitemapSchema.description(`A sitemap object `),
+        outputFolder: Joi.string()
+            .default(``)
+            .description(`Folder path where sitemaps are stored in \`public\`.`),
+        entryLimitPerFile: Joi.number()
+            .min(1)
+            .max(50000)
+            .integer()
+            .default(45000) // default based on upstream "sitemap" plugin default, may need optimization
+            .description(`Number of entries per sitemap file, a sitemap index and multiple sitemaps are created if you have more entries.`),
+        createLinkInHead: Joi.boolean()
+            .default(true)
+            .description("Whether to populate the head of your site with a link to the sitemap."),
+        xslPath: Joi.string().description("Path to the xsl file used to pimp your sitemap !"),
+    });
+};
+exports.pluginOptionsSchema = pluginOptionsSchema;
